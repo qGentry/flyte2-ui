@@ -114,20 +114,34 @@ function getActionEnvsFromTaskSpec(resolvedTaskSpec: TaskSpec): KeyValuePair[] {
     const containers = podSpec['containers']
     if (!Array.isArray(containers)) return []
     const envMap = new Map<string, string>()
+    const referencedNames = new Set<string>()
     for (const c of containers) {
       const env =
         c && typeof c === 'object'
-          ? (c as { env?: Array<{ name?: string; value?: string }> }).env
+          ? (
+              c as {
+                env?: Array<{
+                  name?: string
+                  value?: string
+                  valueFrom?: unknown
+                }>
+              }
+            ).env
           : undefined
       if (!Array.isArray(env)) continue
       for (const e of env) {
         const name = e?.name
         const value = e?.value
         if (typeof name === 'string') {
+          if (e.valueFrom != null) {
+            referencedNames.add(name)
+            continue
+          }
           envMap.set(name, typeof value === 'string' ? value : '')
         }
       }
     }
+    for (const name of referencedNames) envMap.delete(name)
     return Array.from(envMap.entries()).map(
       ([key, value]) =>
         ({
